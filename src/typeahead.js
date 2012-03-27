@@ -1,15 +1,45 @@
+enyo.kind( {
+        tag: 'ul',
+        kind: enyo.Control,
+        name: 'BootMenu',
+        create: function () {
+            this.inherited(arguments);
+            this.addClass('typeahead');
+            this.addClass('dropdown-menu');
+
+        },
+        components: [],
+        addItem: function(item) {
+            this.createComponent({
+                kind: enyo.Control,
+                tag: 'li',
+                content: item
+                }
+            );
+            console.log('add item');
+        }
+
+
+
+    }
+);
+
 enyo.kind(
     {tag: 'input',
         kind :enyo.Control,
         shown: false,
         name: 'Typeahead',
         create: function() {
+
             this.inherited(arguments);
             this.valueChanged();
+            var menu = new BootMenu();
+
         },
         handlers: {onkeypress: 'keypressed',
             onkeyup: 'keyup'
         },
+        components: [{kind: BootMenu, name: 'menu'}],
 
         keypressed: function (sender, e) {
             console.log('pressed owner');
