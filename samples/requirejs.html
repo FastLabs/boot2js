@@ -1,0 +1,29 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+    <title></title>
+    <script type="text/javascript" data-main='scripts/main' src='./scripts/require.js'></script>
+    <script type="text/template" id='first_template'>
+        Future currency: <%= currency %>
+    </script>
+</head>
+<body>
+<div id='search_container'>
+
+</div>
+
+<script type="text/javascript">
+    window.onload = function () {
+        FutureView = require('FutureView');
+        Future = require('FutureModule');
+        future = new Future();
+        view = new FutureView({model: future});
+        view.render();
+
+
+
+    }
+</script>
+</body>
+</html>
