@@ -1,7 +1,6 @@
 # boot2js
 enyo components using twitter bootstrap
 
-
 import React from 'react';
 import TableHeader from 'material-ui/lib/table/table-header';
 import TableRow from 'material-ui/lib/table/table-row';
@@ -32,31 +31,37 @@ function getCell(id, value, colConfig) {
         value = formatter(value);
     }
     const tdStyle = {paddingLeft: '0px', paddingRight: '0px'};
-    if (type === 'object') {
-        return (<TableRowColumn key={id} style={tdStyle}>{getObjectCell(value)}</TableRowColumn>);
+    if (type === 'object') {//if it is an object we should display a complex structure plus one more cell for structure definition
+        return [(<TableRowColumn key={id} style={tdStyle}>{getObjectCell(value)}</TableRowColumn>),
+            (<TableRowColumn key={`val${id}`} style={tdStyle}>{getObjectCell(Object.keys(value))}</TableRowColumn>)
+        ];
     }
-    return (<TableRowColumn key={id} style={tdStyle}>
+    return [(<TableRowColumn key={id} style={tdStyle}>
         <div style={colConfig.style}> {value}</div>
-    </TableRowColumn>);
+    </TableRowColumn>)];
 
 }
 
-function getDataContent(data, config) {
+function getDataContent(data, colConfigs) {
     const rows = [];
     let {columns} = data,
         index = 0,
         stop = false, m = 0;
     while (!stop) {
-        const col = [];
+        const col = [], prefixCols = [];
         columns.forEach((column, cid)=> {
             const {values} = column,
-                colConfig = config[cid];
+                colConfig = colConfigs[column.id];
             if (colConfig && colConfig.visible) {
-                col.push(getCell(`${index}-${cid}`, values[index], colConfig));
+                let cellSpec = getCell(`${index}-${cid}`, values[index], colConfig);
+                col[colConfig.index]= cellSpec[0];
+                if(cellSpec.length > 0 && prefixCols.length === 0) {
+                    prefixCols.push(cellSpec[1]);
+                }
             }
             m = Math.max(m, values.length);
         });
-        rows.push((<TableRow>{col}</TableRow>));
+        rows.push((<TableRow>{col.concat(prefixCols)}</TableRow>));
         index += 1;
         if (index >= m) {
             stop = true;
@@ -67,12 +72,14 @@ function getDataContent(data, config) {
 }
 
 function getHeader(configCols) {
-    const headSpec = [];
+    const headSpec = [],
+            configColName = Object.keys(configCols);
     if (configCols) {
         return (<TableHeader>
             <TableRow>{
-                configCols.reduce((h, c)=> {
-                    let title = c.title || c.id;
+                configColName.reduce((h, cName)=> {
+                    let c = configCols[cName],
+                        title = c.title || c.id;
                     if (c.showTitle !== undefined && !c.showTitle) {
                         title = '';
                     }
@@ -89,12 +96,26 @@ function getHeader(configCols) {
     }
     return (<TableHeader></TableHeader>);
 }
-
-function _getDefaultConfig(data) {
-    if (data && data.columns) {
-        return data.columns.map(col => {
-            return {id: col.id, type: col.type, title: col.title, visible: true};
-        });
+/**
+ * Prepares a table configuration
+ * @param data - table data in format {columns:[{id: 'c1', values: [1, 2, 3]}]}
+ * @param config configuration data in format {columns: [{id: 'c1', type: string, visible:true}]}
+ * @returns {*|{}} containing a hashed by column id configuration
+ * @private
+ */
+function _getDefaultConfig(data, config) {
+    if(config && config.columns) { //if a config is provided hash-it and return it
+        return config.columns.reduce((m, c, index)=> {
+            c.index = index;
+            m[c.id] =  c;
+            return m;
+        }, {});
+    }
+    if (data && data.columns) {// otherwise extract the config from table definition
+        return data.columns.reduce((m, col, index) => {
+            m[col.id] = {id: col.id, type: col.type, title: col.title, visible: true, index};
+            return m;
+        }, {});
     }
 }
 
@@ -102,7 +123,7 @@ class ColumnTable extends React.Component {
 
     render() {
         const {config, data}  = this.props;
-        const columns = (config && config.columns) || _getDefaultConfig(data);
+        const columns = _getDefaultConfig(data, config);
         return (
             <Table seletable={false}>
                 {getHeader(columns)}
