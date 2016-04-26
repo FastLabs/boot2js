@@ -1,7 +1,6 @@
 # boot2js
 enyo components using twitter bootstrap
-
-import React from 'react';
+mport React from 'react';
 import TableHeader from 'material-ui/lib/table/table-header';
 import TableRow from 'material-ui/lib/table/table-row';
 import TableRowColumn from 'material-ui/lib/table/table-row-column';
@@ -14,35 +13,74 @@ const styles = {
     objectSeparator: {borderBottom: '1px', borderBottomStyle: 'solid', borderBottomColor: blueGrey600}
 };
 
-function getObjectCell(val) {
-    if (val) {
-        const keys = Object.keys(val);
-        return (<div> {keys.map((field, i)=> {
-            let style = i < keys.length - 1 ? styles.objectSeparator : undefined;
-            return (<div style={style}>{val[field]}</div>)
-        })}
-        </div>);
+const SIMPLE_TYPES = new Set(['boolean', 'string', 'number', 'date']);
+
+function getObjectCell1(val, typeConfig, formatter) {
+    if (val && typeConfig) {
+        const typeFields = Object.keys(typeConfig),
+            attributes = [];
+
+        typeFields.forEach((field, i) => {
+            const fieldTypeConfig = typeConfig[field];
+            if (isVisible(fieldTypeConfig)) {
+                let style = i < typeFields.length - 1 ? styles.objectSeparator : {},
+                    value = val[field];
+                if (formatter) {
+                    value = formatter(value);
+                }
+                if (value === undefined) {
+                    value = "-";
+                    style.textAlign = 'center';
+                }
+                attributes.push((<div key={`atr-${i}`} style={style}>{value}</div>));
+            }
+        });
+        return attributes;
     }
 }
 
-function getCell(id, value, colConfig) {
-    const {type, formatter} = colConfig;
+function getObjectAttributeNamesCell(typeConfig) {
+    if (typeConfig) {
+        const typeFields = Object.keys(typeConfig),
+            attributes = [];
+        typeFields.forEach((field, i) => {
+            const fieldTypeConfig = typeConfig[field];
+            if (isVisible(fieldTypeConfig)) {
+                let style = i < typeFields.length - 1 ? styles.objectSeparator : undefined,
+                    value = fieldTypeConfig.title;
+                attributes.push((<div key={`atr-${i}`} style={style}>{value}</div>));
+            }
+        });
+        return attributes;
+    }
+}
+
+function getSimpleCell(value, formatter, colConfig) {
     if (formatter) {
         value = formatter(value);
     }
-    const tdStyle = {paddingLeft: '0px', paddingRight: '0px'};
-    if (type === 'object') {//if it is an object we should display a complex structure plus one more cell for structure definition
-        return [(<TableRowColumn key={id} style={tdStyle}>{getObjectCell(value)}</TableRowColumn>),
-            (<TableRowColumn key={`val${id}`} style={tdStyle}>{getObjectCell(Object.keys(value))}</TableRowColumn>)
-        ];
-    }
-    return [(<TableRowColumn key={id} style={tdStyle}>
-        <div style={colConfig.style}> {value}</div>
-    </TableRowColumn>)];
+    return (<div style={colConfig.style}> {value}</div>)
+}
+function getCell(id, value, colConfig, types) {
+    const {type, formatter} = colConfig;
 
+    const tdStyle = {paddingLeft: '0px', paddingRight: '0px'};
+    if (type && SIMPLE_TYPES.has(type.toLowerCase())) {
+        return [(
+            <TableRowColumn key={id} style={tdStyle}>{getSimpleCell(value, formatter, colConfig)} </TableRowColumn>)];
+    }
+    let typeConfig = types[type];
+    return [(<TableRowColumn key={id} style={tdStyle}>{getObjectCell1(value, typeConfig, formatter)}</TableRowColumn>),
+        (<TableRowColumn key={`val${id}`}
+                         style={tdStyle}>{getObjectAttributeNamesCell(typeConfig)}</TableRowColumn>)
+    ];
 }
 
-function getDataContent(data, colConfigs) {
+function isVisible(visibleObject) {
+    return visibleObject && visibleObject.visible;
+}
+
+function getDataContent(data, colConfigs, types) {
     const rows = [];
     let {columns} = data,
         index = 0,
@@ -52,10 +90,10 @@ function getDataContent(data, colConfigs) {
         columns.forEach((column, cid)=> {
             const {values} = column,
                 colConfig = colConfigs[column.id];
-            if (colConfig && colConfig.visible) {
-                let cellSpec = getCell(`${index}-${cid}`, values[index], colConfig);
-                col[colConfig.index]= cellSpec[0];
-                if(cellSpec.length > 0 && prefixCols.length === 0) {
+            if (isVisible(colConfig)) {
+                let cellSpec = getCell(`${index}-${cid}`, values[index], colConfig, types);
+                col[colConfig.index] = cellSpec[0];
+                if (cellSpec.length > 0 && prefixCols.length === 0) {
                     prefixCols.push(cellSpec[1]);
                 }
             }
@@ -73,14 +111,14 @@ function getDataContent(data, colConfigs) {
 
 function getHeader(configCols) {
     const headSpec = [],
-            configColName = Object.keys(configCols);
+        configColName = Object.keys(configCols);
     if (configCols) {
         return (<TableHeader>
             <TableRow>{
                 configColName.reduce((h, cName)=> {
                     let c = configCols[cName],
                         title = c.title || c.id;
-                    if (c.showTitle !== undefined && !c.showTitle) {
+                                                                            if (c.showTitle !== undefined && !c.showTitle) {
                         title = '';
                     }
                     if (c.visible) {
@@ -104,10 +142,10 @@ function getHeader(configCols) {
  * @private
  */
 function _getDefaultConfig(data, config) {
-    if(config && config.columns) { //if a config is provided hash-it and return it
+    if (config && config.columns) { //if a config is provided hash-it and return it
         return config.columns.reduce((m, c, index)=> {
             c.index = index;
-            m[c.id] =  c;
+            m[c.id] = c;
             return m;
         }, {});
     }
@@ -125,13 +163,14 @@ class ColumnTable extends React.Component {
         const {config, data}  = this.props;
         const columns = _getDefaultConfig(data, config);
         return (
-            <Table seletable={false}>
+            <Table selectable={false} fixedHeader={true} height="600px">
                 {getHeader(columns)}
                 <TableBody>
-                    {getDataContent(data, columns)}
+                    {getDataContent(data, columns, (config && config.types) || {})}
                 </TableBody>
             </Table> );
     }
 }
 
 export default ColumnTable;
+ 
